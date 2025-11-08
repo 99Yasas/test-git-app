@@ -4,7 +4,7 @@ import yagmail
 # ---------- EMAIL CONFIG ----------
 # Use Streamlit Secrets for safety
 YOUR_EMAIL = st.secrets["EMAIL"]         # Sender email (your Gmail)
-APP_PASSWORD = st.secrets["APP_PASSWORD"] # App password for Gmail
+APP_PASSWORD = st.secrets["APP_PASSWORD"] # Gmail App Password
 # ----------------------------------
 
 st.set_page_config(page_title="Contact App", page_icon="✉️")
@@ -22,16 +22,16 @@ if st.button("Submit"):
             # Email subject and content
             subject = "New Message from Web App"
             if name.strip() != "":
-                content = f"From: {name}\n\nMessage:\n{message}"
+                content = f"App: My Web App\nFrom: {name}\n\nMessage:\n{message}"
             else:
-                content = f"Message:\n{message}"
+                content = f"App: My Web App\nMessage:\n{message}"
 
             # Send email
-            yag = yagmail.SMTP(f"My Web App <{YOUR_EMAIL}>", APP_PASSWORD)
+            yag = yagmail.SMTP(YOUR_EMAIL, APP_PASSWORD)
             yag.send(to=YOUR_EMAIL, subject=subject, contents=content)
 
             st.success("✅ Your message has been sent!")
-            
+
             # Clear input fields after submission
             st.session_state["name"] = ""
             st.session_state["message"] = ""
@@ -39,6 +39,8 @@ if st.button("Submit"):
             st.error(f"❌ Something went wrong: {e}")
     else:
         st.error("Please type a message first.")
+
+
 
 
 
