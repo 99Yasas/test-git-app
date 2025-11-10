@@ -12,9 +12,9 @@ APP_PASSWORD = st.secrets["APP_PASSWORD"]
 if "day_data" not in st.session_state:
     st.session_state.day_data = []  # Stores all bills of the day
 
-# Initialize editor key if not exists
-if "entry_editor" not in st.session_state:
-    st.session_state["entry_editor"] = pd.DataFrame({"Product": [""], "Price": [0.0]})
+# Initialize a separate DataFrame for the editor
+if "editor_df" not in st.session_state:
+    st.session_state.editor_df = pd.DataFrame({"Product": [""], "Price": [0.0]})
 
 # ----------------- SIDEBAR NAVIGATION -----------------
 page = st.sidebar.radio("Navigate", ["Add Bill", "View All Bills", "Send Full Day Report"])
@@ -26,13 +26,14 @@ if page == "Add Bill":
 
     # Table editor for user input
     entry_table = st.data_editor(
-        st.session_state["entry_editor"],
+        st.session_state.editor_df,
         num_rows="dynamic",
         use_container_width=True,
         key="entry_editor"
     )
 
     if st.button("➕ Add Bill"):
+        # Check if at least one product is filled
         if entry_table["Product"].str.strip().eq("").all():
             st.warning("Please fill at least one product.")
         else:
@@ -46,7 +47,7 @@ if page == "Add Bill":
             st.success(f"✅ Bill added successfully! Total items: {len(entry_table)}")
 
             # --- Reset the editor table safely ---
-            st.session_state["entry_editor"] = pd.DataFrame({"Product": [""], "Price": [0.0]})
+            st.session_state.editor_df = pd.DataFrame({"Product": [""], "Price": [0.0]})
 
 # ----------------- PAGE 2: VIEW ALL BILLS -----------------
 elif page == "View All Bills":
@@ -71,7 +72,7 @@ elif page == "Send Full Day Report":
                 # Combine all day data
                 df = pd.DataFrame(st.session_state.day_data)
 
-                # Save CSV in memory (no file on disk)
+                # Save CSV in memory
                 csv_buffer = BytesIO()
                 df.to_csv(csv_buffer, index=False)
                 csv_buffer.seek(0)
