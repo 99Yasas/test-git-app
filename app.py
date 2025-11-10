@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import yagmail
-from io import BytesIO
+import tempfile
 
 # ----------------- CONFIG -----------------
 st.set_page_config(page_title="Grocery Billing App", page_icon="🛒")
@@ -26,14 +26,13 @@ if page == "Add Bill":
 
     # Table editor for user input
     entry_table = st.data_editor(
-        st.session_state.editor_df,
+        st.session_state["editor_df"],
         num_rows="dynamic",
         use_container_width=True,
         key="entry_editor"
     )
 
     if st.button("➕ Add Bill"):
-        # Check if at least one product is filled
         if entry_table["Product"].str.strip().eq("").all():
             st.warning("Please fill at least one product.")
         else:
@@ -72,19 +71,19 @@ elif page == "Send Full Day Report":
                 # Combine all day data
                 df = pd.DataFrame(st.session_state.day_data)
 
-                # Save CSV in memory
-                csv_buffer = BytesIO()
-                df.to_csv(csv_buffer, index=False)
-                csv_buffer.seek(0)
+                # Save CSV to temporary file
+                with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
+                    df.to_csv(tmp.name, index=False)
+                    tmp.flush()
 
-                # Send email
-                yag = yagmail.SMTP(YOUR_EMAIL, APP_PASSWORD)
-                yag.send(
-                    to=YOUR_EMAIL,
-                    subject="Daily Grocery Shop Report",
-                    contents="Attached is the full day bill report.",
-                    attachments=[("daily_report.csv", csv_buffer)]
-                )
+                    # Send email
+                    yag = yagmail.SMTP(YOUR_EMAIL, APP_PASSWORD)
+                    yag.send(
+                        to=YOUR_EMAIL,
+                        subject="Daily Grocery Shop Report",
+                        contents="Attached is the full day bill report.",
+                        attachments=tmp.name
+                    )
 
                 st.success("✅ Report emailed successfully!")
                 st.balloons()
