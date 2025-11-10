@@ -12,22 +12,21 @@ APP_PASSWORD = st.secrets["APP_PASSWORD"]
 if "day_data" not in st.session_state:
     st.session_state.day_data = []  # Stores all bills of the day
 
+# Initialize editor key if not exists
+if "entry_editor" not in st.session_state:
+    st.session_state["entry_editor"] = pd.DataFrame({"Product": [""], "Price": [0.0]})
+
 # ----------------- SIDEBAR NAVIGATION -----------------
 page = st.sidebar.radio("Navigate", ["Add Bill", "View All Bills", "Send Full Day Report"])
 
 # ----------------- PAGE 1: ADD BILL -----------------
 if page == "Add Bill":
     st.title("🛒 Add Bill Items")
-    st.write("Enter multiple products at once, then click ADD BILL.")
+    st.write("Enter multiple products at once, then click ➕ Add Bill.")
 
-    # Default table for input
-    default_data = {
-        "Product": [""],
-        "Price": [0.0]
-    }
-
+    # Table editor for user input
     entry_table = st.data_editor(
-        pd.DataFrame(default_data),
+        st.session_state["entry_editor"],
         num_rows="dynamic",
         use_container_width=True,
         key="entry_editor"
@@ -45,8 +44,9 @@ if page == "Add Bill":
                     )
 
             st.success(f"✅ Bill added successfully! Total items: {len(entry_table)}")
-            # Reset editor by rerunning
-            st.experimental_rerun()
+
+            # --- Reset the editor table safely ---
+            st.session_state["entry_editor"] = pd.DataFrame({"Product": [""], "Price": [0.0]})
 
 # ----------------- PAGE 2: VIEW ALL BILLS -----------------
 elif page == "View All Bills":
