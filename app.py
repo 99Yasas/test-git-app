@@ -12,36 +12,41 @@ APP_PASSWORD = st.secrets["APP_PASSWORD"]
 st.set_page_config(page_title="Grocery Billing App", page_icon="🛒")
 st.title("Grocery Shop Billing System 🛒")
 
-# ---------- SAFE SESSION STATE INIT ----------
-if "items" not in st.session_state or not isinstance(st.session_state.items, list):
-    st.session_state.items = []   # always reset to empty list
-# ---------------------------------------------
+# ---------- SAFE SESSION STATE HANDLING ----------
+# If items key missing OR corrupted, fix it
+if "items" not in st.session_state:
+    st.session_state.items = []
+elif not isinstance(st.session_state.items, list):
+    st.session_state.items = []   # Force reset if corrupted
+
+# ------------------------------------------------
 
 st.subheader("Add Item to Bill")
 
 # Input fields
 col1, col2 = st.columns(2)
 with col1:
-    product = st.text_input("Product Code / Name")
+    product = st.text_input("Product Code / Name", key="prod")
 with col2:
-    price = st.number_input("Price (Rs)", min_value=0.0, step=1.0)
+    price = st.number_input("Price (Rs)", min_value=0.0, step=1.0, key="prc")
 
-# Add button
+# Add item button
 if st.button("Add Item"):
     if product.strip() == "":
         st.error("Product name cannot be empty.")
     else:
         st.session_state.items.append({
-            "Product": product,
+            "Product": str(product),
             "Price (Rs)": float(price)
         })
         st.success("✅ Item added!")
 
-# Prepare DataFrame safely
-if len(st.session_state.items) > 0:
+# -------- SAFE DATAFRAME CREATION --------
+if isinstance(st.session_state.items, list) and len(st.session_state.items) > 0:
     df = pd.DataFrame(st.session_state.items)
 else:
     df = pd.DataFrame(columns=["Product", "Price (Rs)"])
+# ------------------------------------------
 
 st.subheader("Current Bill Items")
 st.table(df)
@@ -61,7 +66,7 @@ if st.button("Submit & Email Report"):
 
             buffer.seek(0)
 
-            # Email setup
+            # Setup email
             yag = yagmail.SMTP(YOUR_EMAIL, APP_PASSWORD)
 
             today = datetime.date.today().strftime("%Y-%m-%d")
@@ -77,7 +82,7 @@ if st.button("Submit & Email Report"):
 
             st.success("✅ Report emailed successfully!")
 
-            # Clear table
+            # Clear table for next day
             st.session_state.items = []
 
         except Exception as e:
