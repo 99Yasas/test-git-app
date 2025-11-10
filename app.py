@@ -9,8 +9,8 @@ YOUR_EMAIL = st.secrets["EMAIL"]
 APP_PASSWORD = st.secrets["APP_PASSWORD"]
 
 # Initialize items list in session state
-if "items" not in st.session_state:
-    st.session_state.items = []
+if "data_items" not in st.session_state:
+    st.session_state.data_items = []
 
 st.title("🛒 Grocery Billing System")
 st.write("Add product details below and generate the daily bill report.")
@@ -33,16 +33,16 @@ if add_btn:
     elif price <= 0:
         st.warning("Enter a valid price.")
     else:
-        st.session_state.items.append({
+        st.session_state.data_items.append({
             "Product": product,
             "Price": price
         })
         st.success("Item added!")
 
 # --- DISPLAY TABLE ---
-if len(st.session_state.items) > 0:
+if len(st.session_state.data_items) > 0:
     st.subheader("Current Bill Items")
-    df = pd.DataFrame(st.session_state.items)
+    df = pd.DataFrame(st.session_state.data_items)
     st.dataframe(df, use_container_width=True)
 
     total = df["Price"].sum()
@@ -50,13 +50,13 @@ if len(st.session_state.items) > 0:
 
 # --- SUBMIT EMAIL ---
 if st.button("📤 Submit & Email Report"):
-    if len(st.session_state.items) == 0:
+    if len(st.session_state.data_items) == 0:
         st.error("You cannot submit an empty report.")
     else:
         try:
             # Save to Excel
             file_path = "daily_report.xlsx"
-            df = pd.DataFrame(st.session_state.items)
+            df = pd.DataFrame(st.session_state.data_items)
             df.to_excel(file_path, index=False)
 
             # Send email
@@ -71,8 +71,8 @@ if st.button("📤 Submit & Email Report"):
             st.success("✅ Report emailed successfully!")
             st.balloons()
 
-            # Reset items
-            st.session_state.items = []
+            # Clear table after sending
+            st.session_state.data_items = []
 
         except Exception as e:
             st.error(f"❌ Error sending email: {e}")
