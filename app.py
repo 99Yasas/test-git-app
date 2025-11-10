@@ -1,44 +1,84 @@
 import streamlit as st
+import pandas as pd
 import yagmail
+from io import BytesIO
+import datetime
 
-# ---------- EMAIL CONFIG ----------
-# Use Streamlit Secrets for safety
-YOUR_EMAIL = st.secrets["EMAIL"]         # Sender email (your Gmail)
-APP_PASSWORD = st.secrets["APP_PASSWORD"] # Gmail App Password
-# ----------------------------------
+# ---------------- EMAIL CONFIG ----------------
+YOUR_EMAIL = st.secrets["EMAIL"]
+APP_PASSWORD = st.secrets["APP_PASSWORD"]
+# ----------------------------------------------
 
-st.set_page_config(page_title="Contact App", page_icon="✉️")
-st.title("Send me a message")
-st.write("Type your name and message below. I will receive it instantly!")
+st.set_page_config(page_title="Grocery Billing App", page_icon="🧾")
+st.title("Grocery Shop Billing System 🛒")
+
+# ------------- SESSION STATE TABLE -------------
+if "items" not in st.session_state:
+    st.session_state.items = []  # list of dicts
+# -----------------------------------------------
+
+st.subheader("Add Item to Bill")
 
 # Input fields
-name = st.text_input("Your Name (optional)")
-message = st.text_area("Your Message")
+col1, col2 = st.columns(2)
+with col1:
+    product = st.text_input("Product Code / Name")
+with col2:
+    price = st.number_input("Price (Rs)", min_value=0.0, step=1.0)
 
-# Submit button
-if st.button("Submit"):
-    if message.strip() != "":
-        try:
-            # Email subject and content
-            subject = "New Message from Web App"
-            if name.strip() != "":
-                content = f"App: My Web App\nFrom: {name}\n\nMessage:\n{message}"
-            else:
-                content = f"App: My Web App\nMessage:\n{message}"
-
-            # Send email
-            yag = yagmail.SMTP(YOUR_EMAIL, APP_PASSWORD)
-            yag.send(to=YOUR_EMAIL, subject=subject, contents=content)
-
-            st.success("✅ Your message has been sent!")
-
-            # Clear input fields after submission
-            st.session_state["name"] = ""
-            st.session_state["message"] = ""
-        except Exception as e:
-            st.error(f"❌ Something went wrong: {e}")
+# Add button
+if st.button("Add Item"):
+    if product.strip() == "":
+        st.error("Product name cannot be empty.")
     else:
-        st.error("Please type a message first.")
+        st.session_state.items.append({
+            "Product": product,
+            "Price (Rs)": price
+        })
+        st.success("✅ Item added!")
+
+# Convert to DataFrame for display
+df = pd.DataFrame(st.session_state.items)
+
+st.subheader("Current Bill Items")
+st.table(df)
+
+# ---------------- DAY END SUBMIT ----------------
+st.subheader("Day-End Report")
+
+if st.button("Submit & Email Report"):
+    if df.empty:
+        st.error("No items to submit.")
+    else:
+        try:
+            # Create Excel file in memory
+            buffer = BytesIO()
+            with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+                df.to_excel(writer, index=False, sheet_name="Report")
+
+            buffer.seek(0)
+
+            # Email sending
+            yag = yagmail.SMTP(YOUR_EMAIL, APP_PASSWORD)
+
+            today = datetime.date.today().strftime("%Y-%m-%d")
+            subject = f"Grocery Shop Daily Report - {today}"
+            body = f"Attached is today's report containing {len(df)} items."
+
+            yag.send(
+                to=YOUR_EMAIL,
+                subject=subject,
+                contents=body,
+                attachments={f"daily_report_{today}.xlsx": buffer.getvalue()}
+            )
+
+            st.success("✅ Report emailed successfully!")
+
+            # Clear table
+            st.session_state.items = []
+
+        except Exception as e:
+            st.error(f"❌ Error sending email: {e}")
 
 
 
