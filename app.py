@@ -1,36 +1,33 @@
 import streamlit as st
 import pandas as pd
 import yagmail
+from io import BytesIO
 
+# ----------------- CONFIG -----------------
 st.set_page_config(page_title="Grocery Billing App", page_icon="🛒")
-
 YOUR_EMAIL = st.secrets["EMAIL"]
 APP_PASSWORD = st.secrets["APP_PASSWORD"]
 
-# Session state for full-day data
+# ----------------- SESSION STATE -----------------
 if "day_data" not in st.session_state:
-    st.session_state.day_data = []
+    st.session_state.day_data = []  # Stores all bills of the day
 
-# Sidebar navigation
-page = st.sidebar.radio("Navigate", ["Add Bill", "View All Bills"])
+# ----------------- SIDEBAR NAVIGATION -----------------
+page = st.sidebar.radio("Navigate", ["Add Bill", "View All Bills", "Send Full Day Report"])
 
-
-# -----------------------------------------------------
-# ✅ PAGE 1: ADD BILL (Table Input)
-# -----------------------------------------------------
+# ----------------- PAGE 1: ADD BILL -----------------
 if page == "Add Bill":
-
     st.title("🛒 Add Bill Items")
     st.write("Enter multiple products at once, then click ADD BILL.")
 
-    # Temporary entry table for user to type items
-    example = pd.DataFrame({
+    # Default table for input
+    default_data = {
         "Product": [""],
-        "Price": [0]
-    })
+        "Price": [0.0]
+    }
 
     entry_table = st.data_editor(
-        example,
+        pd.DataFrame(default_data),
         num_rows="dynamic",
         use_container_width=True,
         key="entry_editor"
@@ -47,51 +44,52 @@ if page == "Add Bill":
                         {"Product": row["Product"], "Price": row["Price"]}
                     )
 
-            st.success("✅ Bill added successfully!")
+            st.success(f"✅ Bill added successfully! Total items: {len(entry_table)}")
+            # Reset editor by rerunning
+            st.experimental_rerun()
 
-            # Clear the editor table
-            st.session_state.entry_editor = example
-
-    # Submit button to send email with all-day data
-    if st.button("📤 Submit Full Day Report"):
-        if len(st.session_state.day_data) == 0:
-            st.error("No data to submit.")
-        else:
-            try:
-                df = pd.DataFrame(st.session_state.day_data)
-                file_path = "daily_report.csv"
-                df.to_csv(file_path, index=False)
-
-                yag = yagmail.SMTP(YOUR_EMAIL, APP_PASSWORD)
-                yag.send(
-                    to=YOUR_EMAIL,
-                    subject="Daily Grocery Shop Report",
-                    contents="Attached is the full day bill report.",
-                    attachments=file_path
-                )
-
-                st.success("✅ Report emailed successfully!")
-                st.balloons()
-
-                # Clear after sending
-                st.session_state.day_data = []
-
-            except Exception as e:
-                st.error(f"❌ Error sending email: {e}")
-
-
-# -----------------------------------------------------
-# ✅ PAGE 2: VIEW COMPLETE DAY DATA
-# -----------------------------------------------------
-if page == "View All Bills":
-
+# ----------------- PAGE 2: VIEW ALL BILLS -----------------
+elif page == "View All Bills":
     st.title("📄 View Full Day Bills")
-
     if len(st.session_state.day_data) == 0:
         st.info("No data added yet.")
     else:
         df = pd.DataFrame(st.session_state.day_data)
         st.dataframe(df, use_container_width=True)
-
         total = df["Price"].sum()
         st.write(f"### ✅ Total Amount: Rs. {total:.2f}")
+
+# ----------------- PAGE 3: SEND FULL DAY REPORT -----------------
+elif page == "Send Full Day Report":
+    st.title("📤 Send Full Day Report via Email")
+
+    if len(st.session_state.day_data) == 0:
+        st.info("No bills to send.")
+    else:
+        if st.button("Send CSV via Email"):
+            try:
+                # Combine all day data
+                df = pd.DataFrame(st.session_state.day_data)
+
+                # Save CSV in memory (no file on disk)
+                csv_buffer = BytesIO()
+                df.to_csv(csv_buffer, index=False)
+                csv_buffer.seek(0)
+
+                # Send email
+                yag = yagmail.SMTP(YOUR_EMAIL, APP_PASSWORD)
+                yag.send(
+                    to=YOUR_EMAIL,
+                    subject="Daily Grocery Shop Report",
+                    contents="Attached is the full day bill report.",
+                    attachments=[("daily_report.csv", csv_buffer)]
+                )
+
+                st.success("✅ Report emailed successfully!")
+                st.balloons()
+
+                # Clear day data after sending
+                st.session_state.day_data = []
+
+            except Exception as e:
+                st.error(f"❌ Error sending email: {e}")
