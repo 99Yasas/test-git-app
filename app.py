@@ -1,85 +1,78 @@
 import streamlit as st
 import pandas as pd
 import yagmail
-from io import BytesIO
-import datetime
-
-# ---------------- EMAIL CONFIG ----------------
-YOUR_EMAIL = st.secrets["EMAIL"]
-APP_PASSWORD = st.secrets["APP_PASSWORD"]
-# ----------------------------------------------
+import os
 
 st.set_page_config(page_title="Grocery Billing App", page_icon="🛒")
-st.title("Grocery Shop Billing System 🛒")
 
-# ---------- FIXED SESSION STATE ----------
+YOUR_EMAIL = st.secrets["EMAIL"]
+APP_PASSWORD = st.secrets["APP_PASSWORD"]
+
+# Initialize items list in session state
 if "items" not in st.session_state:
-    st.session_state["items"] = []
-if not isinstance(st.session_state["items"], list):
-    st.session_state["items"] = []
-# -----------------------------------------
+    st.session_state.items = []
 
-st.subheader("Add Item to Bill")
+st.title("🛒 Grocery Billing System")
+st.write("Add product details below and generate the daily bill report.")
 
-# Inputs
+# --- INPUT AREA ---
 col1, col2 = st.columns(2)
+
 with col1:
-    product = st.text_input("Product Code / Name")
+    product = st.text_input("Product Name or Code")
+
 with col2:
-    price = st.number_input("Price (Rs)", min_value=0.0, step=1.0)
+    price = st.number_input("Price", min_value=0.0, step=0.5)
 
-# Add button
-if st.button("Add Item"):
+add_btn = st.button("➕ Add Item")
+
+# --- ADD ITEM ---
+if add_btn:
     if product.strip() == "":
-        st.error("Product name cannot be empty.")
+        st.warning("Enter the product name or code.")
+    elif price <= 0:
+        st.warning("Enter a valid price.")
     else:
-        st.session_state["items"].append({
+        st.session_state.items.append({
             "Product": product,
-            "Price (Rs)": float(price)
+            "Price": price
         })
-        st.success("✅ Item added!")
+        st.success("Item added!")
 
-# Convert to DataFrame safely
-if len(st.session_state["items"]) > 0:
-    df = pd.DataFrame(st.session_state["items"])
-else:
-    df = pd.DataFrame(columns=["Product", "Price (Rs)"])
+# --- DISPLAY TABLE ---
+if len(st.session_state.items) > 0:
+    st.subheader("Current Bill Items")
+    df = pd.DataFrame(st.session_state.items)
+    st.dataframe(df, use_container_width=True)
 
-st.subheader("Current Bill Items")
-st.table(df)
+    total = df["Price"].sum()
+    st.write(f"### ✅ Total: Rs. {total:.2f}")
 
-# ---------------- DAY-END REPORT ----------------
-st.subheader("Day-End Report")
-
-if st.button("Submit & Email Report"):
-    if df.empty:
-        st.error("No items to submit.")
+# --- SUBMIT EMAIL ---
+if st.button("📤 Submit & Email Report"):
+    if len(st.session_state.items) == 0:
+        st.error("You cannot submit an empty report.")
     else:
         try:
-            # Create Excel file
-            buffer = BytesIO()
-            with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-                df.to_excel(writer, index=False, sheet_name="Report")
-            buffer.seek(0)
+            # Save to Excel
+            file_path = "daily_report.xlsx"
+            df = pd.DataFrame(st.session_state.items)
+            df.to_excel(file_path, index=False)
 
-            # Email sending
+            # Send email
             yag = yagmail.SMTP(YOUR_EMAIL, APP_PASSWORD)
-
-            today = datetime.date.today().strftime("%Y-%m-%d")
-            subject = f"Grocery Shop Daily Report - {today}"
-            body = f"Attached is today's grocery report with {len(df)} items."
-
             yag.send(
                 to=YOUR_EMAIL,
-                subject=subject,
-                contents=body,
-                attachments={f"daily_report_{today}.xlsx": buffer.getvalue()}
+                subject="Daily Grocery Shop Report",
+                contents="Attached is today's bill report.",
+                attachments=file_path
             )
 
             st.success("✅ Report emailed successfully!")
+            st.balloons()
 
             # Reset items
-            st.session_state["items"] = []
+            st.session_state.items = []
 
         except Exception as e:
             st.error(f"❌ Error sending email: {e}")
