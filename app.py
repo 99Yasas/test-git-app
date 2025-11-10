@@ -9,13 +9,13 @@ YOUR_EMAIL = st.secrets["EMAIL"]
 APP_PASSWORD = st.secrets["APP_PASSWORD"]
 # ----------------------------------------------
 
-st.set_page_config(page_title="Grocery Billing App", page_icon="🧾")
+st.set_page_config(page_title="Grocery Billing App", page_icon="🛒")
 st.title("Grocery Shop Billing System 🛒")
 
-# ------------- SESSION STATE TABLE -------------
-if "items" not in st.session_state:
-    st.session_state.items = []  # list of dicts
-# -----------------------------------------------
+# ---------- SAFE SESSION STATE INIT ----------
+if "items" not in st.session_state or not isinstance(st.session_state.items, list):
+    st.session_state.items = []   # always reset to empty list
+# ---------------------------------------------
 
 st.subheader("Add Item to Bill")
 
@@ -33,12 +33,15 @@ if st.button("Add Item"):
     else:
         st.session_state.items.append({
             "Product": product,
-            "Price (Rs)": price
+            "Price (Rs)": float(price)
         })
         st.success("✅ Item added!")
 
-# Convert to DataFrame for display
-df = pd.DataFrame(st.session_state.items)
+# Prepare DataFrame safely
+if len(st.session_state.items) > 0:
+    df = pd.DataFrame(st.session_state.items)
+else:
+    df = pd.DataFrame(columns=["Product", "Price (Rs)"])
 
 st.subheader("Current Bill Items")
 st.table(df)
@@ -51,14 +54,14 @@ if st.button("Submit & Email Report"):
         st.error("No items to submit.")
     else:
         try:
-            # Create Excel file in memory
+            # Create Excel file
             buffer = BytesIO()
             with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
                 df.to_excel(writer, index=False, sheet_name="Report")
 
             buffer.seek(0)
 
-            # Email sending
+            # Email setup
             yag = yagmail.SMTP(YOUR_EMAIL, APP_PASSWORD)
 
             today = datetime.date.today().strftime("%Y-%m-%d")
@@ -79,9 +82,3 @@ if st.button("Submit & Email Report"):
 
         except Exception as e:
             st.error(f"❌ Error sending email: {e}")
-
-
-
-
-
-
